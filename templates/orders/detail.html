@@ -1,0 +1,202 @@
+{% extends 'base.html' %}
+
+{% block title %}פרטי הזמנה #{{ order.order_number }}{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col">
+        <h2>פרטי הזמנה #{{ order.order_number }}</h2>
+        <span class="badge bg-{{ order.status_color }}">{{ order.status_display }}</span>
+    </div>
+    <div class="col text-end">
+        {% if order.can_edit %}
+        <a href="{{ url_for('orders.edit', order_id=order.id) }}" class="btn btn-warning">
+            <i class="bi bi-pencil"></i> ערוך הזמנה
+        </a>
+        {% endif %}
+        <a href="{{ url_for('orders.list') }}" class="btn btn-secondary">
+            <i class="bi bi-arrow-right"></i> חזור לרשימה
+        </a>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="card-title mb-0">פריטי הזמנה</h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>מוצר</th>
+                                <th>כמות</th>
+                                <th>מחיר ליחידה</th>
+                                <th>סה"כ</th>
+                                <th>סטטוס</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in order.items %}
+                            <tr>
+                                <td>{{ item.product.name }}</td>
+                                <td>{{ item.quantity }}</td>
+                                <td>{{ "%.2f"|format(item.price) }} ₪</td>
+                                <td>{{ "%.2f"|format(item.total) }} ₪</td>
+                                <td>
+                                    <span class="badge bg-{{ item.status_color }}">
+                                        {{ item.status_display }}
+                                    </span>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                        <tfoot>
+                            <tr>
+                                <td colspan="3" class="text-end"><strong>סכום ביניים:</strong></td>
+                                <td>{{ "%.2f"|format(order.subtotal) }} ₪</td>
+                                <td></td>
+                            </tr>
+                            <tr>
+                                <td colspan="3" class="text-end"><strong>מע"מ (17%):</strong></td>
+                                <td>{{ "%.2f"|format(order.vat) }} ₪</td>
+                                <td></td>
+                            </tr>
+                            <tr>
+                                <td colspan="3" class="text-end"><strong>סה"כ לתשלום:</strong></td>
+                                <td><strong>{{ "%.2f"|format(order.total_amount) }} ₪</strong></td>
+                                <td></td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="card-title mb-0">היסטוריית סטטוסים</h5>
+            </div>
+            <div class="card-body">
+                <div class="timeline">
+                    {% for status in order.status_history %}
+                    <div class="timeline-item">
+                        <div class="timeline-date">{{ status.created_at.strftime('%d/%m/%Y %H:%M') }}</div>
+                        <div class="timeline-content">
+                            <h6>{{ status.status_display }}</h6>
+                            <p class="mb-0">{{ status.notes }}</p>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="card-title mb-0">פרטי לקוח</h5>
+            </div>
+            <div class="card-body">
+                <h6>{{ order.customer.name }}</h6>
+                <p class="mb-1">{{ order.customer.email }}</p>
+                <p class="mb-1">{{ order.customer.phone }}</p>
+                <hr>
+                <h6>כתובת למשלוח:</h6>
+                <p class="mb-0">{{ order.shipping_address }}</p>
+            </div>
+        </div>
+
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="card-title mb-0">פרטי הזמנה</h5>
+            </div>
+            <div class="card-body">
+                <p class="mb-1"><strong>תאריך הזמנה:</strong> {{ order.created_at.strftime('%d/%m/%Y %H:%M') }}</p>
+                <p class="mb-1"><strong>סוג הזמנה:</strong> {{ order.order_type_display }}</p>
+                {% if order.notes %}
+                <hr>
+                <h6>הערות:</h6>
+                <p class="mb-0">{{ order.notes }}</p>
+                {% endif %}
+            </div>
+        </div>
+
+        {% if order.shipping %}
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="card-title mb-0">פרטי משלוח</h5>
+            </div>
+            <div class="card-body">
+                <p class="mb-1"><strong>חברת משלוחים:</strong> {{ order.shipping.carrier }}</p>
+                <p class="mb-1"><strong>מספר מעקב:</strong> {{ order.shipping.tracking_number }}</p>
+                <p class="mb-1"><strong>תאריך משלוח:</strong> {{ order.shipping.shipped_at.strftime('%d/%m/%Y %H:%M') }}</p>
+                <p class="mb-1"><strong>סטטוס משלוח:</strong> {{ order.shipping.status_display }}</p>
+                {% if order.shipping.estimated_delivery %}
+                <p class="mb-0"><strong>תאריך מסירה משוער:</strong> {{ order.shipping.estimated_delivery.strftime('%d/%m/%Y') }}</p>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.timeline {
+    position: relative;
+    padding: 20px 0;
+}
+
+.timeline-item {
+    position: relative;
+    padding-right: 30px;
+    margin-bottom: 20px;
+}
+
+.timeline-item:before {
+    content: '';
+    position: absolute;
+    right: 0;
+    top: 0;
+    bottom: -20px;
+    width: 2px;
+    background: #e9ecef;
+}
+
+.timeline-item:last-child:before {
+    display: none;
+}
+
+.timeline-item:after {
+    content: '';
+    position: absolute;
+    right: -4px;
+    top: 0;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: #0d6efd;
+}
+
+.timeline-date {
+    font-size: 0.875rem;
+    color: #6c757d;
+    margin-bottom: 5px;
+}
+
+.timeline-content {
+    background: #f8f9fa;
+    padding: 10px;
+    border-radius: 4px;
+}
+
+.timeline-content h6 {
+    margin-bottom: 5px;
+}
+</style>
+{% endblock %} 

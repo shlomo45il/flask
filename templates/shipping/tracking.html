@@ -1,0 +1,227 @@
+{% extends 'base.html' %}
+
+{% block title %}מעקב משלוח #{{ shipment.id }}{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+<style>
+#map {
+    height: 400px;
+    width: 100%;
+    margin-bottom: 20px;
+}
+.timeline {
+    position: relative;
+    padding: 20px 0;
+}
+.timeline-item {
+    position: relative;
+    padding-right: 30px;
+    margin-bottom: 20px;
+}
+.timeline-item:before {
+    content: '';
+    position: absolute;
+    right: 0;
+    top: 0;
+    bottom: -20px;
+    width: 2px;
+    background: #e9ecef;
+}
+.timeline-item:last-child:before {
+    display: none;
+}
+.timeline-item:after {
+    content: '';
+    position: absolute;
+    right: -4px;
+    top: 0;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: #0d6efd;
+}
+.timeline-date {
+    font-size: 0.875rem;
+    color: #6c757d;
+    margin-bottom: 5px;
+}
+.timeline-content {
+    background: #f8f9fa;
+    padding: 10px;
+    border-radius: 4px;
+}
+.timeline-content h6 {
+    margin-bottom: 5px;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col">
+        <h2>מעקב משלוח #{{ shipment.id }}</h2>
+        <span class="badge bg-{{ shipment.status_color }}">{{ shipment.status_display }}</span>
+    </div>
+    <div class="col text-end">
+        <a href="{{ url_for('shipping.list') }}" class="btn btn-secondary">
+            <i class="bi bi-arrow-right"></i> חזור לרשימה
+        </a>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="card-title mb-0">מסלול משלוח</h5>
+            </div>
+            <div class="card-body">
+                <div id="map"></div>
+            </div>
+        </div>
+
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="card-title mb-0">היסטוריית מיקומים</h5>
+            </div>
+            <div class="card-body">
+                <div class="timeline">
+                    {% for location in shipment.location_history %}
+                    <div class="timeline-item">
+                        <div class="timeline-date">{{ location.timestamp.strftime('%d/%m/%Y %H:%M') }}</div>
+                        <div class="timeline-content">
+                            <h6>מיקום נוכחי</h6>
+                            <p class="mb-0">קו רוחב: {{ location.latitude }}, קו אורך: {{ location.longitude }}</p>
+                            <p class="mb-0">מהירות: {{ location.speed }} קמ"ש</p>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="card-title mb-0">פרטי משלוח</h5>
+            </div>
+            <div class="card-body">
+                <p class="mb-1"><strong>מספר הזמנה:</strong> {{ shipment.order.order_number }}</p>
+                <p class="mb-1"><strong>לקוח:</strong> {{ shipment.order.customer.name }}</p>
+                <p class="mb-1"><strong>כתובת:</strong> {{ shipment.order.shipping_address }}</p>
+                <p class="mb-1"><strong>שליח:</strong> {{ shipment.driver.name }}</p>
+                <p class="mb-1"><strong>רכב:</strong> {{ shipment.vehicle.plate_number }}</p>
+                <p class="mb-1"><strong>תאריך התחלה:</strong> {{ shipment.started_at.strftime('%d/%m/%Y %H:%M') }}</p>
+                {% if shipment.estimated_delivery %}
+                <p class="mb-0"><strong>זמן הגעה משוער:</strong> {{ shipment.estimated_delivery.strftime('%H:%M') }}</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="card-title mb-0">סטטיסטיקות</h5>
+            </div>
+            <div class="card-body">
+                <p class="mb-1"><strong>מרחק נסיעה:</strong> {{ shipment.distance }} ק"מ</p>
+                <p class="mb-1"><strong>זמן נסיעה:</strong> {{ shipment.travel_time }} דקות</p>
+                <p class="mb-1"><strong>מהירות ממוצעת:</strong> {{ shipment.avg_speed }} קמ"ש</p>
+                {% if shipment.remaining_distance %}
+                <p class="mb-0"><strong>מרחק נותר:</strong> {{ shipment.remaining_distance }} ק"מ</p>
+                {% endif %}
+            </div>
+        </div>
+
+        {% if shipment.status == 'in_transit' %}
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="card-title mb-0">עדכון סטטוס</h5>
+            </div>
+            <div class="card-body">
+                <form id="updateStatusForm">
+                    <div class="mb-3">
+                        <label for="status" class="form-label">סטטוס</label>
+                        <select class="form-select" id="status" name="status" required>
+                            <option value="delivered">נמסר</option>
+                            <option value="failed">נכשל</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="notes" class="form-label">הערות</label>
+                        <textarea class="form-control" id="notes" name="notes" rows="3"></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="bi bi-check-circle"></i> עדכן סטטוס
+                    </button>
+                </form>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+<script>
+$(document).ready(function() {
+    // אתחול המפה
+    var map = L.map('map').setView([{{ shipment.current_location.latitude }}, {{ shipment.current_location.longitude }}], 13);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap contributors'
+    }).addTo(map);
+
+    // הוספת נקודות מסלול
+    var routePoints = [];
+    {% for location in shipment.location_history %}
+    routePoints.push([{{ location.latitude }}, {{ location.longitude }}]);
+    {% endfor %}
+
+    // ציור המסלול
+    L.polyline(routePoints, {color: 'blue'}).addTo(map);
+
+    // הוספת נקודות ציון
+    L.marker([{{ shipment.order.shipping_address.latitude }}, {{ shipment.order.shipping_address.longitude }}])
+        .bindPopup('כתובת מסירה')
+        .addTo(map);
+
+    // עדכון סטטוס
+    $('#updateStatusForm').submit(function(e) {
+        e.preventDefault();
+        var formData = {
+            shipment_id: {{ shipment.id }},
+            status: $('#status').val(),
+            notes: $('#notes').val()
+        };
+
+        $.ajax({
+            url: '/api/shipping/update-status',
+            method: 'POST',
+            data: formData,
+            success: function(response) {
+                window.location.reload();
+            },
+            error: function(xhr) {
+                alert('שגיאה בעדכון הסטטוס: ' + xhr.responseJSON.message);
+            }
+        });
+    });
+
+    // עדכון מיקום בזמן אמת
+    function updateLocation() {
+        $.get('/api/shipping/{{ shipment.id }}/location', function(data) {
+            if (data.latitude && data.longitude) {
+                map.setView([data.latitude, data.longitude], 13);
+                routePoints.push([data.latitude, data.longitude]);
+                L.polyline(routePoints, {color: 'blue'}).addTo(map);
+            }
+        });
+    }
+
+    // עדכון כל 30 שניות
+    setInterval(updateLocation, 30000);
+});
+</script>
+{% endblock %} 

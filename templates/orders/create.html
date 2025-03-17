@@ -1,0 +1,198 @@
+{% extends 'base.html' %}
+
+{% block title %}יצירת הזמנה חדשה{% endblock %}
+
+{% block extra_css %}
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col">
+        <h2>יצירת הזמנה חדשה</h2>
+    </div>
+</div>
+
+<form method="post" id="orderForm">
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">פרטי לקוח</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label for="customer" class="form-label">בחר לקוח</label>
+                        <select class="form-select" id="customer" name="customer_id" required>
+                            <option value="">בחר לקוח...</option>
+                            {% for customer in customers %}
+                            <option value="{{ customer.id }}">{{ customer.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="shipping_address" class="form-label">כתובת למשלוח</label>
+                        <textarea class="form-control" id="shipping_address" name="shipping_address" rows="3" required></textarea>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-6">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">פרטי הזמנה</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label for="order_type" class="form-label">סוג הזמנה</label>
+                        <select class="form-select" id="order_type" name="order_type" required>
+                            <option value="standard">רגילה</option>
+                            <option value="express">דחופה</option>
+                            <option value="bulk">כמות גדולה</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="notes" class="form-label">הערות</label>
+                        <textarea class="form-control" id="notes" name="notes" rows="3"></textarea>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="card-title mb-0">פריטי הזמנה</h5>
+        </div>
+        <div class="card-body">
+            <div id="orderItems">
+                <div class="order-item mb-3">
+                    <div class="row">
+                        <div class="col-md-5">
+                            <label class="form-label">מוצר</label>
+                            <select class="form-select product-select" name="products[]" required>
+                                <option value="">בחר מוצר...</option>
+                                {% for product in products %}
+                                <option value="{{ product.id }}" data-price="{{ product.price }}">{{ product.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">כמות</label>
+                            <input type="number" class="form-control quantity" name="quantities[]" min="1" value="1" required>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">מחיר ליחידה</label>
+                            <input type="number" class="form-control price" readonly>
+                        </div>
+                        <div class="col-md-1">
+                            <label class="form-label">&nbsp;</label>
+                            <button type="button" class="btn btn-danger remove-item">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <button type="button" class="btn btn-secondary" id="addItem">
+                <i class="bi bi-plus-circle"></i> הוסף פריט
+            </button>
+        </div>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6">
+                    <h5>סיכום הזמנה</h5>
+                    <table class="table">
+                        <tr>
+                            <td>סכום ביניים:</td>
+                            <td id="subtotal">0.00 ₪</td>
+                        </tr>
+                        <tr>
+                            <td>מע"מ (17%):</td>
+                            <td id="vat">0.00 ₪</td>
+                        </tr>
+                        <tr>
+                            <td><strong>סה"כ לתשלום:</strong></td>
+                            <td><strong id="total">0.00 ₪</strong></td>
+                        </tr>
+                    </table>
+                </div>
+                <div class="col-md-6 text-end">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-check-circle"></i> שמור הזמנה
+                    </button>
+                    <a href="{{ url_for('orders.list') }}" class="btn btn-secondary">
+                        <i class="bi bi-x-circle"></i> ביטול
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</form>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+<script>
+$(document).ready(function() {
+    // אתחול Select2
+    $('.product-select').select2({
+        placeholder: 'בחר מוצר...',
+        dir: 'rtl'
+    });
+
+    // הוספת פריט חדש
+    $('#addItem').click(function() {
+        var newItem = $('.order-item').first().clone();
+        newItem.find('select, input').val('');
+        newItem.find('.quantity').val(1);
+        $('#orderItems').append(newItem);
+        $('.product-select').select2({
+            placeholder: 'בחר מוצר...',
+            dir: 'rtl'
+        });
+    });
+
+    // הסרת פריט
+    $(document).on('click', '.remove-item', function() {
+        if ($('.order-item').length > 1) {
+            $(this).closest('.order-item').remove();
+            calculateTotal();
+        }
+    });
+
+    // חישוב מחיר ליחידה
+    $(document).on('change', '.product-select', function() {
+        var price = $(this).find(':selected').data('price');
+        $(this).closest('.order-item').find('.price').val(price);
+        calculateTotal();
+    });
+
+    // חישוב כמות
+    $(document).on('change', '.quantity', function() {
+        calculateTotal();
+    });
+
+    // חישוב סה"כ
+    function calculateTotal() {
+        var subtotal = 0;
+        $('.order-item').each(function() {
+            var price = parseFloat($(this).find('.price').val()) || 0;
+            var quantity = parseInt($(this).find('.quantity').val()) || 0;
+            subtotal += price * quantity;
+        });
+        
+        var vat = subtotal * 0.17;
+        var total = subtotal + vat;
+        
+        $('#subtotal').text(subtotal.toFixed(2) + ' ₪');
+        $('#vat').text(vat.toFixed(2) + ' ₪');
+        $('#total').text(total.toFixed(2) + ' ₪');
+    }
+});
+</script>
+{% endblock %} 

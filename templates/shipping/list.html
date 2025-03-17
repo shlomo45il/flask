@@ -1,0 +1,271 @@
+{% extends 'base.html' %}
+
+{% block title %}רשימת משלוחים{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col">
+        <h2>רשימת משלוחים</h2>
+    </div>
+    <div class="col text-end">
+        <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#startShippingModal">
+            <i class="bi bi-truck"></i> התחל משלוח
+        </button>
+    </div>
+</div>
+
+<div class="card mb-4">
+    <div class="card-body">
+        <form method="get" class="row g-3">
+            <div class="col-md-3">
+                <label for="status" class="form-label">סטטוס</label>
+                <select name="status" id="status" class="form-select">
+                    <option value="">הכל</option>
+                    <option value="pending">ממתין</option>
+                    <option value="in_transit">בדרך</option>
+                    <option value="delivered">נמסר</option>
+                    <option value="failed">נכשל</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label for="date_from" class="form-label">מתאריך</label>
+                <input type="date" class="form-control" id="date_from" name="date_from">
+            </div>
+            <div class="col-md-3">
+                <label for="date_to" class="form-label">עד תאריך</label>
+                <input type="date" class="form-control" id="date_to" name="date_to">
+            </div>
+            <div class="col-md-3">
+                <label for="search" class="form-label">חיפוש</label>
+                <input type="text" class="form-control" id="search" name="search" placeholder="חיפוש לפי מספר הזמנה או לקוח">
+            </div>
+            <div class="col-12">
+                <button type="submit" class="btn btn-primary">סנן</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="card-title mb-0">משלוחים פעילים</h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>מספר הזמנה</th>
+                                <th>לקוח</th>
+                                <th>כתובת</th>
+                                <th>שליח</th>
+                                <th>סטטוס</th>
+                                <th>פעולות</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for shipment in active_shipments %}
+                            <tr>
+                                <td>{{ shipment.order.order_number }}</td>
+                                <td>{{ shipment.order.customer.name }}</td>
+                                <td>{{ shipment.order.shipping_address }}</td>
+                                <td>{{ shipment.driver.name }}</td>
+                                <td>
+                                    <span class="badge bg-{{ shipment.status_color }}">
+                                        {{ shipment.status_display }}
+                                    </span>
+                                </td>
+                                <td>
+                                    <a href="{{ url_for('shipping.tracking', shipment_id=shipment.id) }}" class="btn btn-sm btn-info">
+                                        <i class="bi bi-geo-alt"></i> מעקב
+                                    </a>
+                                    {% if shipment.can_update %}
+                                    <button type="button" class="btn btn-sm btn-warning update-status" 
+                                            data-shipment-id="{{ shipment.id }}">
+                                        <i class="bi bi-pencil"></i> עדכן
+                                    </button>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="6" class="text-center">אין משלוחים פעילים</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="card-title mb-0">סטטיסטיקות משלוח</h5>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <h6>היום</h6>
+                    <p class="mb-1">משלוחים שהושלמו: {{ stats.today_completed }}</p>
+                    <p class="mb-1">זמן ממוצע למשלוח: {{ stats.today_avg_time }} דקות</p>
+                </div>
+                <div class="mb-3">
+                    <h6>השבוע</h6>
+                    <p class="mb-1">משלוחים שהושלמו: {{ stats.week_completed }}</p>
+                    <p class="mb-1">זמן ממוצע למשלוח: {{ stats.week_avg_time }} דקות</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="card-title mb-0">שליחים פעילים</h5>
+            </div>
+            <div class="card-body">
+                {% for driver in active_drivers %}
+                <div class="mb-3">
+                    <h6>{{ driver.name }}</h6>
+                    <p class="mb-1">משלוחים פעילים: {{ driver.active_shipments }}</p>
+                    <p class="mb-1">ממוצע משלוחים ליום: {{ driver.avg_daily_shipments }}</p>
+                </div>
+                {% else %}
+                <p class="mb-0">אין שליחים פעילים</p>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- מודל התחלת משלוח -->
+<div class="modal fade" id="startShippingModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">התחלת משלוח</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="startShippingForm">
+                    <div class="mb-3">
+                        <label for="orderNumber" class="form-label">מספר הזמנה</label>
+                        <input type="text" class="form-control" id="orderNumber" name="order_number" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="driver" class="form-label">שליח</label>
+                        <select class="form-select" id="driver" name="driver_id" required>
+                            <option value="">בחר שליח...</option>
+                            {% for driver in available_drivers %}
+                            <option value="{{ driver.id }}">{{ driver.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="vehicle" class="form-label">רכב</label>
+                        <select class="form-select" id="vehicle" name="vehicle_id" required>
+                            <option value="">בחר רכב...</option>
+                            {% for vehicle in available_vehicles %}
+                            <option value="{{ vehicle.id }}">{{ vehicle.plate_number }} - {{ vehicle.model }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">ביטול</button>
+                <button type="button" class="btn btn-primary" id="confirmStartShipping">אישור</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- מודל עדכון סטטוס -->
+<div class="modal fade" id="updateStatusModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">עדכון סטטוס משלוח</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="updateStatusForm">
+                    <input type="hidden" id="shipmentId" name="shipment_id">
+                    <div class="mb-3">
+                        <label for="status" class="form-label">סטטוס</label>
+                        <select class="form-select" id="status" name="status" required>
+                            <option value="in_transit">בדרך</option>
+                            <option value="delivered">נמסר</option>
+                            <option value="failed">נכשל</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="notes" class="form-label">הערות</label>
+                        <textarea class="form-control" id="notes" name="notes" rows="3"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">ביטול</button>
+                <button type="button" class="btn btn-primary" id="confirmUpdateStatus">אישור</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    // אישור התחלת משלוח
+    $('#confirmStartShipping').click(function() {
+        var formData = {
+            order_number: $('#orderNumber').val(),
+            driver_id: $('#driver').val(),
+            vehicle_id: $('#vehicle').val()
+        };
+
+        $.ajax({
+            url: '/api/shipping/start',
+            method: 'POST',
+            data: formData,
+            success: function(response) {
+                window.location.reload();
+            },
+            error: function(xhr) {
+                alert('שגיאה בהתחלת המשלוח: ' + xhr.responseJSON.message);
+            }
+        });
+    });
+
+    // פתיחת מודל עדכון סטטוס
+    $('.update-status').click(function() {
+        var shipmentId = $(this).data('shipment-id');
+        $('#shipmentId').val(shipmentId);
+        $('#updateStatusModal').modal('show');
+    });
+
+    // אישור עדכון סטטוס
+    $('#confirmUpdateStatus').click(function() {
+        var formData = {
+            shipment_id: $('#shipmentId').val(),
+            status: $('#status').val(),
+            notes: $('#notes').val()
+        };
+
+        $.ajax({
+            url: '/api/shipping/update-status',
+            method: 'POST',
+            data: formData,
+            success: function(response) {
+                window.location.reload();
+            },
+            error: function(xhr) {
+                alert('שגיאה בעדכון הסטטוס: ' + xhr.responseJSON.message);
+            }
+        });
+    });
+});
+</script>
+{% endblock %} 

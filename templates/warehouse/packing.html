@@ -1,0 +1,199 @@
+{% extends 'base.html' %}
+
+{% block title %}אריזת הזמנות{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col">
+        <h2>אריזת הזמנות</h2>
+    </div>
+    <div class="col text-end">
+        <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#startPackingModal">
+            <i class="bi bi-play-circle"></i> התחל אריזה
+        </button>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="card-title mb-0">הזמנות ממתינות לאריזה</h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>מספר הזמנה</th>
+                                <th>תאריך</th>
+                                <th>לקוח</th>
+                                <th>כמות פריטים</th>
+                                <th>עדיפות</th>
+                                <th>פעולות</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for order in pending_orders %}
+                            <tr>
+                                <td>{{ order.order_number }}</td>
+                                <td>{{ order.created_at.strftime('%d/%m/%Y %H:%M') }}</td>
+                                <td>{{ order.customer.name }}</td>
+                                <td>{{ order.items_count }}</td>
+                                <td>
+                                    <span class="badge bg-{{ order.priority_color }}">
+                                        {{ order.priority_display }}
+                                    </span>
+                                </td>
+                                <td>
+                                    <button type="button" class="btn btn-sm btn-primary start-packing" 
+                                            data-order-id="{{ order.id }}"
+                                            data-order-number="{{ order.order_number }}">
+                                        <i class="bi bi-play-circle"></i> התחל
+                                    </button>
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="6" class="text-center">אין הזמנות ממתינות לאריזה</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="card-title mb-0">סטטיסטיקות אריזה</h5>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <h6>היום</h6>
+                    <p class="mb-1">הזמנות שהושלמו: {{ stats.today_completed }}</p>
+                    <p class="mb-1">זמן ממוצע לאריזה: {{ stats.today_avg_time }} דקות</p>
+                </div>
+                <div class="mb-3">
+                    <h6>השבוע</h6>
+                    <p class="mb-1">הזמנות שהושלמו: {{ stats.week_completed }}</p>
+                    <p class="mb-1">זמן ממוצע לאריזה: {{ stats.week_avg_time }} דקות</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="card-title mb-0">הזמנות בתהליך אריזה</h5>
+            </div>
+            <div class="card-body">
+                {% for order in in_progress_orders %}
+                <div class="mb-3">
+                    <h6>הזמנה #{{ order.order_number }}</h6>
+                    <p class="mb-1">אורז: {{ order.packer.name }}</p>
+                    <p class="mb-1">זמן התחלה: {{ order.packing_started_at.strftime('%H:%M') }}</p>
+                    <div class="progress">
+                        <div class="progress-bar" role="progressbar" style="width: {{ order.packing_progress }}%">
+                            {{ order.packing_progress }}%
+                        </div>
+                    </div>
+                </div>
+                {% else %}
+                <p class="mb-0">אין הזמנות בתהליך אריזה</p>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="card-title mb-0">מלאי אריזות</h5>
+            </div>
+            <div class="card-body">
+                {% for box in packing_materials %}
+                <div class="mb-2">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span>{{ box.name }}</span>
+                        <span class="badge {% if box.quantity < box.min_quantity %}bg-danger{% else %}bg-success{% endif %}">
+                            {{ box.quantity }} יחידות
+                        </span>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- מודל התחלת אריזה -->
+<div class="modal fade" id="startPackingModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">התחלת אריזה</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="startPackingForm">
+                    <input type="hidden" id="orderId" name="order_id">
+                    <div class="mb-3">
+                        <label for="orderNumber" class="form-label">מספר הזמנה</label>
+                        <input type="text" class="form-control" id="orderNumber" readonly>
+                    </div>
+                    <div class="mb-3">
+                        <label for="boxType" class="form-label">סוג אריזה</label>
+                        <select class="form-select" id="boxType" name="box_type" required>
+                            <option value="">בחר סוג אריזה...</option>
+                            {% for box in packing_materials %}
+                            <option value="{{ box.id }}" {% if box.quantity < box.min_quantity %}disabled{% endif %}>
+                                {{ box.name }} ({{ box.quantity }} במלאי)
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">ביטול</button>
+                <button type="button" class="btn btn-primary" id="confirmStartPacking">אישור</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    // פתיחת מודל התחלת אריזה
+    $('.start-packing').click(function() {
+        var orderId = $(this).data('order-id');
+        var orderNumber = $(this).data('order-number');
+        $('#orderId').val(orderId);
+        $('#orderNumber').val(orderNumber);
+        $('#startPackingModal').modal('show');
+    });
+
+    // אישור התחלת אריזה
+    $('#confirmStartPacking').click(function() {
+        var formData = {
+            order_id: $('#orderId').val(),
+            box_type: $('#boxType').val()
+        };
+
+        $.ajax({
+            url: '/api/warehouse/start-packing',
+            method: 'POST',
+            data: formData,
+            success: function(response) {
+                window.location.href = '/warehouse/packing/' + formData.order_id;
+            },
+            error: function(xhr) {
+                alert('שגיאה בהתחלת האריזה: ' + xhr.responseJSON.message);
+            }
+        });
+    });
+});
+</script>
+{% endblock %} 

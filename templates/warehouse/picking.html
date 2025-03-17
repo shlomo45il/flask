@@ -1,0 +1,182 @@
+{% extends 'base.html' %}
+
+{% block title %}ליקוט הזמנות{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col">
+        <h2>ליקוט הזמנות</h2>
+    </div>
+    <div class="col text-end">
+        <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#startPickingModal">
+            <i class="bi bi-play-circle"></i> התחל ליקוט
+        </button>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="card-title mb-0">הזמנות ממתינות לליקוט</h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>מספר הזמנה</th>
+                                <th>תאריך</th>
+                                <th>לקוח</th>
+                                <th>כמות פריטים</th>
+                                <th>עדיפות</th>
+                                <th>פעולות</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for order in pending_orders %}
+                            <tr>
+                                <td>{{ order.order_number }}</td>
+                                <td>{{ order.created_at.strftime('%d/%m/%Y %H:%M') }}</td>
+                                <td>{{ order.customer.name }}</td>
+                                <td>{{ order.items_count }}</td>
+                                <td>
+                                    <span class="badge bg-{{ order.priority_color }}">
+                                        {{ order.priority_display }}
+                                    </span>
+                                </td>
+                                <td>
+                                    <button type="button" class="btn btn-sm btn-primary start-picking" 
+                                            data-order-id="{{ order.id }}"
+                                            data-order-number="{{ order.order_number }}">
+                                        <i class="bi bi-play-circle"></i> התחל
+                                    </button>
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="6" class="text-center">אין הזמנות ממתינות לליקוט</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="card-title mb-0">סטטיסטיקות ליקוט</h5>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <h6>היום</h6>
+                    <p class="mb-1">הזמנות שהושלמו: {{ stats.today_completed }}</p>
+                    <p class="mb-1">זמן ממוצע לליקוט: {{ stats.today_avg_time }} דקות</p>
+                </div>
+                <div class="mb-3">
+                    <h6>השבוע</h6>
+                    <p class="mb-1">הזמנות שהושלמו: {{ stats.week_completed }}</p>
+                    <p class="mb-1">זמן ממוצע לליקוט: {{ stats.week_avg_time }} דקות</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="card-title mb-0">הזמנות בתהליך ליקוט</h5>
+            </div>
+            <div class="card-body">
+                {% for order in in_progress_orders %}
+                <div class="mb-3">
+                    <h6>הזמנה #{{ order.order_number }}</h6>
+                    <p class="mb-1">מתחיל: {{ order.picker.name }}</p>
+                    <p class="mb-1">זמן התחלה: {{ order.picking_started_at.strftime('%H:%M') }}</p>
+                    <div class="progress">
+                        <div class="progress-bar" role="progressbar" style="width: {{ order.picking_progress }}%">
+                            {{ order.picking_progress }}%
+                        </div>
+                    </div>
+                </div>
+                {% else %}
+                <p class="mb-0">אין הזמנות בתהליך ליקוט</p>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- מודל התחלת ליקוט -->
+<div class="modal fade" id="startPickingModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">התחלת ליקוט</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="startPickingForm">
+                    <input type="hidden" id="orderId" name="order_id">
+                    <div class="mb-3">
+                        <label for="orderNumber" class="form-label">מספר הזמנה</label>
+                        <input type="text" class="form-control" id="orderNumber" readonly>
+                    </div>
+                    <div class="mb-3">
+                        <label for="scanLocation" class="form-label">סרוק מיקום התחלה</label>
+                        <input type="text" class="form-control" id="scanLocation" autofocus>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">ביטול</button>
+                <button type="button" class="btn btn-primary" id="confirmStartPicking">אישור</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    // פתיחת מודל התחלת ליקוט
+    $('.start-picking').click(function() {
+        var orderId = $(this).data('order-id');
+        var orderNumber = $(this).data('order-number');
+        $('#orderId').val(orderId);
+        $('#orderNumber').val(orderNumber);
+        $('#startPickingModal').modal('show');
+    });
+
+    // אישור התחלת ליקוט
+    $('#confirmStartPicking').click(function() {
+        var formData = {
+            order_id: $('#orderId').val(),
+            location: $('#scanLocation').val()
+        };
+
+        $.ajax({
+            url: '/api/warehouse/start-picking',
+            method: 'POST',
+            data: formData,
+            success: function(response) {
+                window.location.href = '/warehouse/picking/' + formData.order_id;
+            },
+            error: function(xhr) {
+                alert('שגיאה בהתחלת הליקוט: ' + xhr.responseJSON.message);
+            }
+        });
+    });
+
+    // סריקת מיקום
+    $('#scanLocation').keypress(function(e) {
+        if (e.which == 13) {
+            e.preventDefault();
+            $('#confirmStartPicking').click();
+        }
+    });
+});
+</script>
+{% endblock %} 
